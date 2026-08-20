@@ -1,0 +1,41 @@
+name: verify a52sxq port
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install verification dependencies
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends bash coreutils git
+
+      - name: Shell syntax check
+        run: bash -n scripts/*.sh
+
+      - name: Structural verification
+        run: |
+          chmod +x scripts/*.sh
+          ./scripts/verify.sh --source-root . --report-dir out/verify
+
+      - name: Upload verification report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: a52sxq-verification-${{ github.run_number }}
+          path: out/verify/build-report.txt
+          if-no-files-found: warn
+          retention-days: 14
