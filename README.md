@@ -20,7 +20,7 @@ O projeto separa deliberadamente a experiência de userspace do suporte de hardw
 
 A pesquisa inicial selecionou o **Xiaomi 11 Lite 5G NE (`lisa`) como comparador de plataforma**, não como fonte de hardware. Ele usa Snapdragon 778G 5G / SM7325 e oferece uma árvore pública com configuração de áudio, overlays, extração de blobs e integração de componentes Xiaomi. Como o A52s também usa a família SM7325, `lisa` é um ponto de comparação mais racional do que transportar indiscriminadamente um donor como Xiaomi 15. A árvore `lisa` consultada está arquivada; por isso, qualquer uso futuro deve fixar commit e validar a compatibilidade antes do build.
 
-O donor de **userspace HyperOS** permanece parametrizável. O pipeline não baixa uma ROM proprietária de origem não verificada. Para uma tentativa real de port, será necessário fornecer uma origem autorizada e reproduzível por meio de `HYPEROS_SOURCE_URL`/`HYPEROS_SOURCE_SHA256` ou disponibilizar os artefatos privados exigidos como secrets/artifacts do GitHub. Sem esse material, o pipeline executa o bring-up e as verificações, mas não pode fabricar legal ou tecnicamente um sistema HyperOS completo.
+O donor de **userspace HyperOS 2 baseado em Android 15** permanece parametrizável. O pipeline não baixa uma ROM proprietária de origem não verificada. Para uma tentativa real de port, será necessário fornecer uma origem autorizada e reproduzível por meio de `HYPEROS_SOURCE_URL/HYPEROS_SOURCE_REF/HYPEROS_SOURCE_SHA256` ou disponibilizar os artefatos privados exigidos como secrets/artifacts do GitHub. Sem esse material, o pipeline executa o bring-up e as verificações, mas não pode fabricar legal ou tecnicamente um sistema HyperOS completo.
 
 ## Estrutura
 
@@ -54,8 +54,8 @@ Para preparar fontes públicas e metadados:
 
 ```bash
 export DONOR=lisa
-export ANDROID_VERSION=14
-export HYPEROS_VERSION=1.x
+export ANDROID_VERSION=15
+export HYPEROS_VERSION=2.0
 ./scripts/sync.sh --workspace "$PWD/.work"
 ```
 
@@ -78,7 +78,7 @@ O workflow não usa credenciais embutidas nem baixa automaticamente uma ROM prop
 
 ## Segurança, licenças e boot
 
-O repositório contém apenas infraestrutura, configuração e metadados públicos. Não inclui firmware Samsung, vendor proprietário ou um dump HyperOS. O uso de blobs deve respeitar a licença e a posse do dispositivo. SELinux permissive, quando necessário, deve ser somente uma etapa temporária de depuração; o objetivo final é `Enforcing`.
+O repositório contém apenas infraestrutura, configuração e metadados públicos para o alvo HyperOS 2/Android 15. Não inclui firmware Samsung, vendor proprietário ou um dump HyperOS. O uso de blobs deve respeitar a licença e a posse do dispositivo. SELinux permissive, quando necessário, deve ser somente uma etapa temporária de depuração; o objetivo final é `Enforcing`.
 
 Um **build bem-sucedido no GitHub Actions não prova boot**. A confirmação de boot exige testar o artefato em um A52s desbloqueado, coletar logs e registrar o resultado. O projeto só marcará `boot_confirmed` após evidência fornecida por teste físico ou logs de boot verificáveis.
 
@@ -89,3 +89,6 @@ Um **build bem-sucedido no GitHub Actions não prova boot**. A confirmação de 
 [3]: https://github.com/PixelOS-Devices-old/device_xiaomi_lisa "Árvore pública do Xiaomi 11 Lite 5G NE lisa"
 [4]: https://github.com/PixelExperience-Devices/kernel_samsung_sm7325 "Kernel comum SM7325 para dispositivos Samsung"
 [5]: https://github.com/TheMuppets/proprietary_vendor_samsung_a52sxq "Vendor público comunitário do A52s"
+[6]: https://github.com/TheMysticle/android_device_xiaomi_nuwa-unofficial "Árvore não oficial do Xiaomi 13 Pro, com referência a HyperOS/Android 15"
+[7]: https://github.com/chkndrp/device_xiaomi_sm6225ad-recovery "Árvore de recovery SM6225-AD com documentação de Android 15/HyperOS 2"
+[8]: https://github.com/PixelOS-Devices-old/device_xiaomi_lisa "Árvore do Xiaomi 11 Lite 5G NE, comparador SM7325"

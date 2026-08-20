@@ -13,14 +13,14 @@ A árvore pública do A52s deve ser fixada por commit antes de cada build. A pes
 | Device tree A52s | `A52S_DEVICE_URL`, `A52S_DEVICE_REF` | Sim | Deve identificar `a52sxq` e gerar `BoardConfig`/manifesto válidos. |
 | Kernel/DTB/DTBO A52s | `A52S_KERNEL_URL`, `A52S_KERNEL_REF` | Sim | Deve ser compatível com SM7325, bootloader e configuração do modelo. |
 | Vendor/firmware A52s | `A52S_VENDOR_URL` ou artifact privado | Sim | Blobs podem ser extraídos somente de dispositivo/dump autorizado. |
-| Donor userspace | `HYPEROS_SOURCE_URL`, `HYPEROS_SOURCE_REF` | Sim para HyperOS real | A origem deve ser autorizada, estável e acompanhada de hash. |
+| Donor userspace HyperOS 2/Android 15 | `HYPEROS_SOURCE_URL`, `HYPEROS_SOURCE_REF` | Sim para HyperOS real | A origem deve ser autorizada, estável e acompanhada de hash. |
 | Hashes | `*_SHA256` | Recomendado | O pipeline registra e verifica quando fornecido. |
 
 O projeto não incorpora dumps proprietários ao Git. O usuário que possui o aparelho pode fornecer os arquivos por um artifact privado ou secret de curta duração, conforme os limites do GitHub e as licenças aplicáveis.
 
 ## Donor e compatibilidade
 
-`lisa` é o comparador Qualcomm SM7325 inicial. Ele não fornece um kernel ou vendor intercambiável com o Samsung. Xiaomi 12, Redmi Note 13 Pro 5G e Xiaomi 15 continuam candidatos para userspace, desde que a versão Android/HyperOS, a arquitetura HAL e a disponibilidade legal dos arquivos sejam comparadas antes de uso.
+`lisa` é o comparador Qualcomm SM7325 inicial para manter a proximidade de plataforma. O alvo de userspace agora é HyperOS 2 sobre Android 15. `lisa` não fornece um kernel ou vendor intercambiável com o Samsung. Xiaomi 12, Redmi Note 13 Pro 5G e Xiaomi 15 continuam candidatos para userspace, desde que a versão Android/HyperOS, a arquitetura HAL e a disponibilidade legal dos arquivos sejam comparadas antes de uso.
 
 A matriz de decisão inicial é:
 
@@ -67,6 +67,8 @@ A validação posterior deve priorizar display, touch, áudio, Wi-Fi, Bluetooth,
 
 Permissive pode ser utilizado apenas em um branch de depuração e nunca deve ser o estado final publicado. AVCs devem ser coletados, reduzidos a regras necessárias e validados novamente em enforcing.
 
-## Estado atual
+## Alvo de versão e estado atual
 
-O repositório acabou de ser criado e contém a infraestrutura inicial. Não há ainda donor HyperOS fornecido, blobs privados, imagens de kernel/vendor ou teste físico. O próximo run é deliberadamente um **bring-up/verification run**; ele não deve ser interpretado como prova de uma ROM bootável.
+O alvo de versão solicitado é **HyperOS 2 / Android 15**. A origem HyperOS deve ser fornecida por URL/ref/commit/hash autorizados; as árvores públicas do A52s e o comparador `lisa` não incluem, por si só, uma imagem HyperOS 2 redistribuível.
+
+O repositório contém a infraestrutura inicial. Não há ainda donor HyperOS 2/Android 15 fornecido, blobs privados, imagens de kernel/vendor ou teste físico. O próximo run é deliberadamente um **bring-up/verification run**; ele não deve ser interpretado como prova de uma ROM bootável.
