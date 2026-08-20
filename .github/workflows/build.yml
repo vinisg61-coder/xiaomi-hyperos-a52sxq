@@ -25,11 +25,11 @@ on:
         type: choice
         options: [userdebug, eng, user]
       BUILD_MODE:
-        description: 'prepare valida infraestrutura; donor-validate baixa/verifica o donor; full exige a árvore Android e insumos nativos'
+        description: 'prepare valida; donor-validate verifica o donor; port-stage combina userspace HyperOS e hardware A52s; full compila a árvore Android'
         required: true
         default: 'prepare'
         type: choice
-        options: [prepare, donor-validate, full]
+        options: [prepare, donor-validate, port-stage, full]
       CLEAN_BUILD:
         description: 'Remover workspaces e saídas antes do build'
         required: true
@@ -59,12 +59,16 @@ env:
   HYPEROS_ARCHIVE_URL: https://pixeldrain.com/api/file/s12gJsEx?download=1
   HYPEROS_ARCHIVE_SIZE: '4338708939'
   HYPEROS_ARCHIVE_SHA256: c84941ebece1d99101ae19ffda7f7a4ce911433c49e051d693d7de869fa46edf
+  A52SXQ_VENDOR_URL: https://github.com/Mesa-Labs-Archive/proprietary_vendor_samsung_a52sxq/releases/download/A528BXXS6FXA1_BTU/A528BXXS6FXA1_vendor.zip
+  A52SXQ_VENDOR_SHA256: dfc8acf78196d21287f137aa07e378cf9df0c6c55805fff1a81ec0c1dc0d3c43
+  A52SXQ_KERNEL_URL: https://github.com/Mesa-Labs-Archive/proprietary_vendor_samsung_a52sxq/releases/download/A528BXXS6FXA1_BTU/A528BXXS6FXA1_kernel.tar
+  A52SXQ_KERNEL_SHA256: 9175331267f196a19f6d1cf9cc489150ed615396af0e8aeb51972be08336eb04
 
 jobs:
   bringup:
     name: Prepare/build a52sxq (${{ inputs.BUILD_MODE || 'prepare' }})
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 120
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -79,7 +83,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            bash coreutils curl git jq openjdk-17-jdk python3 tar unzip ca-certificates
+            bash coreutils curl git jq lz4 openjdk-17-jdk python3 tar unzip zstd ca-certificates
 
       - name: Check project scripts
         run: |
@@ -88,7 +92,7 @@ jobs:
 
       - name: Synchronize pinned public sources
         run: |
-          if [ "$BUILD_MODE" = full ] || [ "$BUILD_MODE" = donor-validate ]; then
+          if [ "$BUILD_MODE" = full ] || [ "$BUILD_MODE" = donor-validate ] || [ "$BUILD_MODE" = port-stage ]; then
             ./scripts/sync.sh --workspace .work --clean --require-hyperos
           else
             ./scripts/sync.sh --workspace .work --clean
@@ -103,6 +107,10 @@ jobs:
           if [ "$BUILD_MODE" = donor-validate ]; then
             ./scripts/validate_donor_archive.sh --source-root . --archive .work/hyperos-donor.zip --report-dir out/donor-validate
             printf 'donor_validation=true\nflashable=false\nboot_confirmed=false\n' > out/build-report.txt
+          elif [ "$BUILD_MODE" = port-stage ]; then
+            ./scripts/fetch_a52sxq_native.sh --out-dir .work/a52sxq-native --clean
+            ./scripts/port_stage.sh --source-root . --donor-archive .work/hyperos-donor.zip --native-dir .work/a52sxq-native --out-dir out/port
+            printf 'port_stage=true\nflashable=false\nboot_confirmed=false\n' > out/build-report.txt
           else
             ./scripts/build.sh \
               --source-root . \
@@ -136,5 +144,6 @@ jobs:
             out/manifest/
             out/logs/
             out/donor-validate/
+            out/port/
           if-no-files-found: error
           retention-days: 14
