@@ -144,6 +144,5 @@ jobs:
             out/manifest/
             out/logs/
             out/donor-validate/
-            out/port/
           if-no-files-found: error
           retention-days: 14
