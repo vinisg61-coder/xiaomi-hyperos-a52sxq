@@ -25,11 +25,11 @@ on:
         type: choice
         options: [userdebug, eng, user]
       BUILD_MODE:
-        description: 'prepare valida a infraestrutura; full exige todas as entradas e tenta gerar imagens'
+        description: 'prepare valida infraestrutura; donor-validate baixa/verifica o donor; full exige a árvore Android e insumos nativos'
         required: true
         default: 'prepare'
         type: choice
-        options: [prepare, full]
+        options: [prepare, donor-validate, full]
       CLEAN_BUILD:
         description: 'Remover workspaces e saídas antes do build'
         required: true
@@ -56,6 +56,9 @@ env:
   HYPEROS_SOURCE_URL: ${{ secrets.HYPEROS_SOURCE_URL }}
   HYPEROS_SOURCE_REF: ${{ secrets.HYPEROS_SOURCE_REF }}
   HYPEROS_SOURCE_COMMIT: ${{ secrets.HYPEROS_SOURCE_COMMIT }}
+  HYPEROS_ARCHIVE_URL: https://pixeldrain.com/api/file/s12gJsEx?download=1
+  HYPEROS_ARCHIVE_SIZE: '4338708939'
+  HYPEROS_ARCHIVE_SHA256: ${{ secrets.HYPEROS_ARCHIVE_SHA256 }}
 
 jobs:
   bringup:
@@ -85,7 +88,7 @@ jobs:
 
       - name: Synchronize pinned public sources
         run: |
-          if [ "$BUILD_MODE" = full ]; then
+          if [ "$BUILD_MODE" = full ] || [ "$BUILD_MODE" = donor-validate ]; then
             ./scripts/sync.sh --workspace .work --clean --require-hyperos
           else
             ./scripts/sync.sh --workspace .work --clean
@@ -96,14 +99,20 @@ jobs:
 
       - name: Prepare or build
         run: |
-          ./scripts/build.sh \
-            --source-root . \
-            --out-dir out \
-            --mode "$BUILD_MODE" \
-            --variant "$BUILD_VARIANT" \
-            --donor "$DONOR" \
-            --android-version "$ANDROID_VERSION" \
-            --hyperos-version "$HYPEROS_VERSION"
+          mkdir -p out
+          if [ "$BUILD_MODE" = donor-validate ]; then
+            ./scripts/validate_donor_archive.sh --source-root . --archive .work/hyperos-donor.zip --report-dir out/donor-validate
+            printf 'donor_validation=true\nflashable=false\nboot_confirmed=false\n' > out/build-report.txt
+          else
+            ./scripts/build.sh \
+              --source-root . \
+              --out-dir out \
+              --mode "$BUILD_MODE" \
+              --variant "$BUILD_VARIANT" \
+              --donor "$DONOR" \
+              --android-version "$ANDROID_VERSION" \
+              --hyperos-version "$HYPEROS_VERSION"
+          fi
 
       - name: Verify result
         run: |
@@ -126,5 +135,6 @@ jobs:
             out/verify/build-report.txt
             out/manifest/
             out/logs/
+            out/donor-validate/
           if-no-files-found: error
           retention-days: 14
