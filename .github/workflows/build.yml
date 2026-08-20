@@ -1,0 +1,130 @@
+name: a52sxq bring-up build
+
+on:
+  workflow_dispatch:
+    inputs:
+      DONOR:
+        description: 'Donor de comparação/userspace'
+        required: true
+        default: 'lisa'
+        type: string
+      ANDROID_VERSION:
+        description: 'Versão Android esperada'
+        required: true
+        default: '14'
+        type: string
+      HYPEROS_VERSION:
+        description: 'Versão HyperOS, se uma fonte autorizada estiver configurada'
+        required: true
+        default: '1.x'
+        type: string
+      BUILD_VARIANT:
+        description: 'Variante Android'
+        required: true
+        default: 'userdebug'
+        type: choice
+        options: [userdebug, eng, user]
+      BUILD_MODE:
+        description: 'prepare valida a infraestrutura; full exige todas as entradas e tenta gerar imagens'
+        required: true
+        default: 'prepare'
+        type: choice
+        options: [prepare, full]
+      CLEAN_BUILD:
+        description: 'Remover workspaces e saídas antes do build'
+        required: true
+        default: true
+        type: boolean
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: a52sxq-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DONOR: ${{ inputs.DONOR || 'lisa' }}
+  ANDROID_VERSION: ${{ inputs.ANDROID_VERSION || '14' }}
+  HYPEROS_VERSION: ${{ inputs.HYPEROS_VERSION || '1.x' }}
+  BUILD_VARIANT: ${{ inputs.BUILD_VARIANT || 'userdebug' }}
+  BUILD_MODE: ${{ inputs.BUILD_MODE || 'prepare' }}
+  HYPEROS_SOURCE_URL: ${{ secrets.HYPEROS_SOURCE_URL }}
+  HYPEROS_SOURCE_REF: ${{ secrets.HYPEROS_SOURCE_REF }}
+  HYPEROS_SOURCE_COMMIT: ${{ secrets.HYPEROS_SOURCE_COMMIT }}
+
+jobs:
+  bringup:
+    name: Prepare/build a52sxq (${{ inputs.BUILD_MODE || 'prepare' }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Clean workspace when requested
+        if: ${{ inputs.CLEAN_BUILD != 'false' }}
+        run: rm -rf .work out dist
+
+      - name: Install host dependencies
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            bash coreutils curl git jq openjdk-17-jdk python3 tar unzip ca-certificates
+
+      - name: Check project scripts
+        run: |
+          chmod +x scripts/*.sh
+          ./scripts/setup.sh --check-only
+
+      - name: Synchronize pinned public sources
+        run: |
+          if [ "$BUILD_MODE" = full ]; then
+            ./scripts/sync.sh --workspace .work --clean --require-hyperos
+          else
+            ./scripts/sync.sh --workspace .work --clean
+          fi
+
+      - name: Apply reviewed patches
+        run: ./scripts/patch.sh --source-root .
+
+      - name: Prepare or build
+        run: |
+          ./scripts/build.sh \
+            --source-root . \
+            --out-dir out \
+            --mode "$BUILD_MODE" \
+            --variant "$BUILD_VARIANT" \
+            --donor "$DONOR" \
+            --android-version "$ANDROID_VERSION" \
+            --hyperos-version "$HYPEROS_VERSION"
+
+      - name: Verify result
+        run: |
+          if [ "$BUILD_MODE" = full ]; then
+            ./scripts/verify.sh --source-root . --report-dir out/verify --require-images
+          else
+            ./scripts/verify.sh --source-root . --report-dir out/verify
+          fi
+
+      - name: Package result
+        run: ./scripts/package.sh --input-dir out --output-dir dist
+
+      - name: Upload bring-up bundle and reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: a52sxq-${{ env.BUILD_MODE }}-${{ github.run_number }}
+          path: |
+            dist/
+            out/build-report.txt
+            out/verify/build-report.txt
+            out/manifest/
+            out/logs/
+          if-no-files-found: error
+          retention-days: 14
