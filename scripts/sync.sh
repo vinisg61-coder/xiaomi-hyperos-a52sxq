@@ -70,10 +70,32 @@ if [[ -n "${HYPEROS_SOURCE_URL:-}" ]]; then
     git -C "$HYPEROS_DEST" checkout --detach "origin/$HYPEROS_REF"
   fi
   printf 'hyperos-userspace\t%s\t%s\t%s\n' "$HYPEROS_SOURCE_URL" "$HYPEROS_REF" "$(git -C "$HYPEROS_DEST" rev-parse HEAD)" >> "$WORKSPACE/manifests/public-sources.tsv"
+elif [[ -n "${HYPEROS_ARCHIVE_URL:-}" ]]; then
+  HYPEROS_DEST="$WORKSPACE/sources/hyperos-userspace"
+  HYPEROS_ARCHIVE="$WORKSPACE/hyperos-donor.zip"
+  mkdir -p "$HYPEROS_DEST"
+  curl -L --fail --retry 5 --retry-delay 2 --retry-all-errors \
+    -o "$HYPEROS_ARCHIVE" "$HYPEROS_ARCHIVE_URL"
+  actual_size="$(stat -c '%s' "$HYPEROS_ARCHIVE")"
+  if [[ -n "${HYPEROS_ARCHIVE_SIZE:-}" && "$actual_size" != "$HYPEROS_ARCHIVE_SIZE" ]]; then
+    echo "Tamanho divergente do donor HyperOS: esperado $HYPEROS_ARCHIVE_SIZE, obtido $actual_size" >&2
+    exit 4
+  fi
+  actual_sha256="$(sha256sum "$HYPEROS_ARCHIVE" | awk '{print $1}')"
+  if [[ -n "${HYPEROS_ARCHIVE_SHA256:-}" && "$actual_sha256" != "$HYPEROS_ARCHIVE_SHA256" ]]; then
+    echo "SHA256 divergente do donor HyperOS: esperado $HYPEROS_ARCHIVE_SHA256, obtido $actual_sha256" >&2
+    exit 5
+  fi
+  printf '%s\n' "sha256=$actual_sha256" "size=$actual_size" "url=$HYPEROS_ARCHIVE_URL" > "$WORKSPACE/manifests/hyperos-archive.txt"
+  unzip -l "$HYPEROS_ARCHIVE" > "$WORKSPACE/manifests/hyperos-archive-list.txt"
+  unzip -tq "$HYPEROS_ARCHIVE"
+  # The archive is treated as data only; no contained binary is executed.
+  ln -s "../../hyperos-donor.zip" "$HYPEROS_DEST/CraftyOs_China_HOTFIX.zip"
+  printf 'hyperos-archive\t%s\t%s\t%s\n' "$HYPEROS_ARCHIVE_URL" "$actual_size" "$actual_sha256" >> "$WORKSPACE/manifests/public-sources.tsv"
 else
   echo "hyperos-userspace\tNOT_PROVIDED\tNOT_PROVIDED\tNOT_PROVIDED" >> "$WORKSPACE/manifests/public-sources.tsv"
   if "$REQUIRE_HYPEROS"; then
-    echo "HYPEROS_SOURCE_URL não foi fornecida; build HyperOS completo não pode continuar." >&2
+    echo "Nenhuma fonte HyperOS (git ou archive) foi fornecida; build completo não pode continuar." >&2
     exit 3
   fi
 fi
