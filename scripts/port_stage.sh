@@ -30,15 +30,24 @@ command -v python3 >/dev/null || { echo "python3 ausente" >&2; exit 1; }
 
 LPUNPACK="$SOURCE_ROOT/tools/lpunpack.py"
 [[ -f "$LPUNPACK" ]] || { echo "tools/lpunpack.py ausente" >&2; exit 1; }
-mkdir -p "$OUT_DIR/donor" "$OUT_DIR/native" "$OUT_DIR/manifest" "$OUT_DIR/logs"
-rm -rf "$OUT_DIR/donor/logical" "$OUT_DIR/donor/super.img"
+mkdir -p "$OUT_DIR/donor/logical" "$OUT_DIR/native" "$OUT_DIR/manifest" "$OUT_DIR/logs"
+rm -rf "$OUT_DIR/donor/logical" "$OUT_DIR/donor/super.img" "$OUT_DIR/donor/super.img.zst"
 mkdir -p "$OUT_DIR/donor/logical"
 
+# Keep the donor container and decompressed super image outside the published
+# bundle. They are large intermediates; the logical partitions and metadata are
+# the reproducible staging payload needed by the next bring-up phase.
+WORK_DIR="${TMPDIR:-$ROOT_DIR/.work}/a52sxq-port-stage"
+rm -rf "$WORK_DIR"
+mkdir -p "$WORK_DIR"
+cleanup() { rm -rf "$WORK_DIR"; }
+trap cleanup EXIT
+
 unzip -tq "$DONOR_ARCHIVE"
-unzip -p "$DONOR_ARCHIVE" super.img.zst > "$OUT_DIR/donor/super.img.zst"
-zstd -q -d -f "$OUT_DIR/donor/super.img.zst" -o "$OUT_DIR/donor/super.img"
-python3 "$LPUNPACK" --info --format json "$OUT_DIR/donor/super.img" > "$OUT_DIR/donor/logical/metadata.json"
-python3 "$LPUNPACK" "$OUT_DIR/donor/super.img" "$OUT_DIR/donor/logical"
+unzip -p "$DONOR_ARCHIVE" super.img.zst > "$WORK_DIR/super.img.zst"
+zstd -q -d -f "$WORK_DIR/super.img.zst" -o "$WORK_DIR/super.img"
+python3 "$LPUNPACK" --info --format json "$WORK_DIR/super.img" > "$OUT_DIR/donor/logical/metadata.json"
+python3 "$LPUNPACK" "$WORK_DIR/super.img" "$OUT_DIR/donor/logical"
 
 for name in boot dtbo vbmeta vendor_boot vendor; do
   cp -f "$NATIVE_DIR/$name.img" "$OUT_DIR/native/$name.img"
@@ -63,15 +72,18 @@ boot_confirmed=false
 flashable=false
 hardware_port_complete=false
 EOF
-sha256sum "$DONOR_ARCHIVE" "$OUT_DIR/donor/super.img.zst" "$OUT_DIR/donor/super.img" "$OUT_DIR"/donor/logical/*.img "$OUT_DIR"/native/*.img > "$OUT_DIR/manifest/hashes.sha256"
+sha256sum "$DONOR_ARCHIVE" | sed "s#  $DONOR_ARCHIVE#  CraftyOs_China_HOTFIX.zip#" > "$OUT_DIR/manifest/donor-archive.sha256"
+sha256sum "$OUT_DIR"/donor/logical/*.img "$OUT_DIR"/native/*.img > "$OUT_DIR/manifest/hashes.sha256"
 find "$OUT_DIR/donor/logical" -maxdepth 1 -type f -name '*.img' -printf '%f\t%s bytes\n' | sort > "$OUT_DIR/manifest/donor-logical-images.tsv"
 cat > "$OUT_DIR/README.txt" <<'EOF'
 This is a hybrid port staging bundle for Samsung Galaxy A52s (a52sxq).
 HyperOS userspace partitions come from the validated donor archive.
 Boot, DTBO, vbmeta, vendor_boot and vendor come from a native A52s release.
-This bundle is not flashable: AVB, SELinux, init, VINTF, dynamic-partition
-layout and framework/vendor compatibility still require a device-specific
-rebuild and test. Never flash donor Xiaomi boot/vendor images on the A52s.
+The donor super container is intentionally excluded as a large intermediate;
+logical partitions and metadata are included instead. This bundle is not
+flashable: AVB, SELinux, init, VINTF, dynamic-partition layout and
+framework/vendor compatibility still require a device-specific rebuild and
+test. Never flash donor Xiaomi boot/vendor images on the A52s.
 EOF
 printf 'port_stage=true\nflashable=false\nboot_confirmed=false\n' > "$OUT_DIR/build-report.txt"
 echo "Port híbrido preparado em $OUT_DIR"
