@@ -11,12 +11,12 @@ on:
       ANDROID_VERSION:
         description: 'Versão Android esperada'
         required: true
-        default: '14'
+        default: '15'
         type: string
       HYPEROS_VERSION:
         description: 'Versão HyperOS, se uma fonte autorizada estiver configurada'
         required: true
-        default: '1.x'
+        default: '2.0'
         type: string
       BUILD_VARIANT:
         description: 'Variante Android'
@@ -49,8 +49,8 @@ concurrency:
 
 env:
   DONOR: ${{ inputs.DONOR || 'lisa' }}
-  ANDROID_VERSION: ${{ inputs.ANDROID_VERSION || '14' }}
-  HYPEROS_VERSION: ${{ inputs.HYPEROS_VERSION || '1.x' }}
+  ANDROID_VERSION: ${{ inputs.ANDROID_VERSION || '15' }}
+  HYPEROS_VERSION: ${{ inputs.HYPEROS_VERSION || '2.0' }}
   BUILD_VARIANT: ${{ inputs.BUILD_VARIANT || 'userdebug' }}
   BUILD_MODE: ${{ inputs.BUILD_MODE || 'prepare' }}
   HYPEROS_SOURCE_URL: ${{ secrets.HYPEROS_SOURCE_URL }}
