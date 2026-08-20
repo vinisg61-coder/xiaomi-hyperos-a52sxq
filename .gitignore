@@ -1,0 +1,17 @@
+.work/
+out/
+dist/
+proprietary/a52sxq/*
+!proprietary/a52sxq/README.md
+!proprietary/a52sxq/.gitkeep
+*.img
+*.img.lz4
+*.bin
+*.zip
+*.tar.gz
+*.key
+*.pem
+*.pk8
+*.keystore
+.env
+.env.*
