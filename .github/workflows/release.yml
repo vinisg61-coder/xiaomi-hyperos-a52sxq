@@ -1,0 +1,56 @@
+name: package a52sxq release
+
+on:
+  workflow_dispatch:
+    inputs:
+      RELEASE_KIND:
+        description: 'Tipo do pacote'
+        required: true
+        default: 'bringup'
+        type: choice
+        options: [bringup, test-images]
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends bash coreutils curl git jq openjdk-17-jdk python3 tar unzip ca-certificates
+
+      - name: Prepare scripts
+        run: chmod +x scripts/*.sh
+
+      - name: Synchronize public sources
+        run: ./scripts/sync.sh --workspace .work --clean
+
+      - name: Create reproducible preparation bundle
+        run: ./scripts/build.sh --source-root . --out-dir out --mode prepare --variant userdebug
+
+      - name: Verify release inputs
+        run: ./scripts/verify.sh --source-root . --report-dir out/verify
+
+      - name: Package without false flashable claim
+        run: ./scripts/package.sh --input-dir out --output-dir dist
+
+      - name: Upload release asset
+        uses: actions/upload-artifact@v4
+        with:
+          name: a52sxq-release-${{ github.run_number }}
+          path: |
+            dist/
+            out/verify/build-report.txt
+          if-no-files-found: error
+          retention-days: 30
