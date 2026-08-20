@@ -27,8 +27,14 @@ if [[ -f "$INPUT_DIR/manifest/build.properties" ]]; then
   source <(sed -E 's/[^A-Za-z0-9_].*=.*/&/' "$INPUT_DIR/manifest/build.properties" | grep -E '^(build_id|target_device|boot_confirmed)=') || true
 fi
 
-image_count=$(find "$INPUT_DIR" -maxdepth 2 -type f -name '*.img' | wc -l | tr -d ' ')
-if (( image_count > 0 )); then
+image_count=$(find "$INPUT_DIR" -maxdepth 3 -type f -name '*.img' | wc -l | tr -d ' ')
+port_stage=false
+if [[ -f "$INPUT_DIR/port/manifest/port.properties" ]]; then
+  port_stage=true
+fi
+if "$port_stage"; then
+  name="a52sxq-port-staging-${GITHUB_RUN_ID:-local}"
+elif (( image_count > 0 )); then
   name="a52sxq-test-images-${GITHUB_RUN_ID:-local}"
   if "$FORCE_FLASHABLE"; then
     [[ -f "$INPUT_DIR/manifest/build.properties" ]] || { echo "manifest de build ausente" >&2; exit 2; }
@@ -44,5 +50,6 @@ fi
 archive="$OUTPUT_DIR/${name}.tar.gz"
 tar -czf "$archive" -C "$INPUT_DIR" .
 sha256sum "$archive" > "$archive.sha256"
-printf 'artifact=%s\nkind=%s\nimages=%s\n' "$archive" "$([[ $image_count -gt 0 ]] && echo test-images || echo bringup-bundle)" "$image_count" > "$OUTPUT_DIR/package.properties"
+if "$port_stage"; then kind=port-staging; elif (( image_count > 0 )); then kind=test-images; else kind=bringup-bundle; fi
+printf 'artifact=%s\nkind=%s\nimages=%s\nflashable=false\n' "$archive" "$kind" "$image_count" > "$OUTPUT_DIR/package.properties"
 echo "Pacote criado: $archive"

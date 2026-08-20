@@ -1,0 +1,12 @@
+# RIL
+ro.vendor.multisim.				u:object_r:vendor_radio_prop:s0
+ro.vendor.radio.				u:object_r:vendor_radio_prop:s0
+
+# Sensors
+vendor.sensor.file.permission                    u:object_r:vendor_sensors_prop:s0
+
+# Qseecom
+vendor.sys.qseecomd.enable          u:object_r:vendor_qseecomd_prop:s0
+
+# wifi
+vendor.wifi.                                     u:object_r:vendor_wifi_prop:s0

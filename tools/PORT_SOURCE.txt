@@ -1,0 +1,1 @@
+unix3dgforce/lpunpack; LGPL-3.0-or-later; imported from commit c59b8f3b069c5a8aa438a049fa4a091177172434

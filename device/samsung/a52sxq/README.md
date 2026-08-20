@@ -1,14 +1,27 @@
-# Device tree placeholder — `a52sxq`
+# Android device tree for samsung SM-A528B (a52sxq)
 
-Este diretório é o ponto de integração da árvore Samsung A52s. A fonte pública fixada em `config/sources.env` deve ser sincronizada para o workspace do build e validada para conter o codinome `a52sxq`/modelo SM-A528B.
+```
+#
+# Copyright (C) 2022 The LineageOS Project
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+```
 
-Não há uma `BoardConfig.mk` completa neste repositório porque a árvore de device precisa ser importada de uma fonte compatível e revisada junto com kernel, vendor, firmware e versão Android. O pipeline falha com uma mensagem explícita se esse diretório continuar sem os arquivos de build esperados.
+Device configuration for Samsung Galaxy A52S 5G
+===============================================
+The Samsung Galaxy A52S 5G (codename _a52sxq_, _A528B_) is a upper mid-range smartphone from Samsung
 
-## Requisitos mínimos
+## Device specifications
+Basic    | Spec Sheet
+--------:|:----------------------
+SoC      | Qualcomm Snapdragon 778G
+CPU      | Octa-core (4x2.4ghz Kryo 670 & 4x1.9ghz Kryo 670)
+GPU      | Adreno 642L
+Memory   | 128GB 6GB RAM, 128GB 8GB RAM
+Shipped Android version | Android 11, OneUI 3.1
+Battery  | Li-ion 4500mAh, non-removable
+Display  | Super AMOLED, 120Hz, 800 nits, 6.5 inch, 1080 x 2400 pixels, 20:9 ratio
 
-- `AndroidProducts.mk` ou equivalente do sistema de build;
-- `BoardConfig.mk` com partições e boot image coerentes;
-- `device.mk`/produto para `a52sxq`;
-- manifests VINTF e init scripts compatíveis;
-- lista de blobs e licença/proveniência;
-- DTB/DTBO e kernel correspondentes ao firmware do aparelho.
+## Device picture
+<img src="https://user-images.githubusercontent.com/70204635/189288678-d0d8f79b-6d43-4266-a9d0-ec291d86e16c.jpg" width="45%"/>

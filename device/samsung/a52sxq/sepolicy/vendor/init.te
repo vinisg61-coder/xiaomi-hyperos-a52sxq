@@ -1,0 +1,15 @@
+allow init sysfs:file rw_file_perms;
+allow init vendor_file:dir create;
+allow kernel sysfs:file { open  read };
+
+# For mount tracefs tracefs /sys/kernel/tracing
+allow init debugfs_tracing_debug:dir mounton;
+allow init proc_sched:file getattr;
+allow init hwservicemanager:binder { call };
+allow init hal_health_hwservice:hwservice_manager find;
+allow init vendor_sysfs_gpu_max_clock:file rw_file_perms;
+allow init vendor_sysfs_devfreq:file rw_file_perms;
+allow init servicemanager:binder { call  transfer };
+
+# /mnt/vendor/efs
+allow init efs_file:dir mounton;

@@ -1,0 +1,2 @@
+persist.sys.usb.config=mtp
+persist.vendor.dpm.feature=11

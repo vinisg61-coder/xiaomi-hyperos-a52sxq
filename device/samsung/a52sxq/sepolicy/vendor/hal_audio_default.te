@@ -1,0 +1,2 @@
+get_prop(hal_audio_default, default_prop)
+get_prop(hal_audio_default, radio_prop)
