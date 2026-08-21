@@ -95,8 +95,8 @@ jobs:
         run: |
           git clone --depth 1 https://github.com/Rprop/aosp15_partition_tools /tmp/aosp15_partition_tools
           cd /tmp/aosp15_partition_tools
-          git fetch --depth 1 origin 5e92a5d
-          git checkout --detach 5e92a5d
+          git fetch --depth 1 origin 5e92a5d504de33414318ced8bad5507440bb8c30
+          git checkout --detach 5e92a5d504de33414318ced8bad5507440bb8c30
           chmod +x linux_glibc_x86_64/lpmake
 
       - name: Synchronize pinned public sources
