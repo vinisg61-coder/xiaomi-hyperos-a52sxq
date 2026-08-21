@@ -10,6 +10,7 @@ TOOLS_DIR="${TOOLS_DIR:-$ROOT_DIR/tools}"
 LPMTOOLS_DIR="${LPMTOOLS_DIR:-/home/ubuntu/aosp15_partition_tools/linux_glibc_x86_64}"
 AVBTOOL="${AVBTOOL:-$ROOT_DIR/tools/avbtool.py}"
 RUN_ID="${GITHUB_RUN_ID:-local}"
+INSTALL_MODE="${INSTALL_MODE:-fastbootd}"
 
 usage() {
   cat <<'EOF'
@@ -84,6 +85,48 @@ python3 "$AVBTOOL" make_vbmeta_image --algorithm NONE --set_hashtree_disabled_fl
 ln "$PAYLOAD_DIR/super.img" "$PACKAGE_DIR/payload/super.img"
 cp -f "$PHYSICAL_DIR"/*.img "$PACKAGE_DIR/payload/physical/"
 
+if [[ "$INSTALL_MODE" == "twrp" ]]; then
+  cat > "$PACKAGE_DIR/META-INF/com/google/android/updater-script" <<'EOF'
+ui_print("A52s HyperOS 2 experimental TWRP installer");
+ui_print("Writes the complete super image and native boot chain.");
+ui_print("This is experimental; keep a full Odin/Download Mode recovery path.");
+EOF
+  cat > "$PACKAGE_DIR/META-INF/com/google/android/update-binary" <<'EOF'
+#!/sbin/sh
+set -u
+ui_print() { echo "ui_print $1"; echo "ui_print"; }
+abort() { ui_print "ERROR: $1"; exit 1; }
+ZIP="$3"
+[ -n "$ZIP" ] || abort "ZIP path ausente"
+command -v unzip >/dev/null 2>&1 || abort "unzip ausente na TWRP"
+command -v dd >/dev/null 2>&1 || abort "dd ausente na TWRP"
+command -v simg2img >/dev/null 2>&1 || abort "simg2img ausente; este ZIP exige recovery com simg2img"
+DEVICE="$(getprop ro.product.device 2>/dev/null || true)"
+MODEL="$(getprop ro.product.model 2>/dev/null || true)"
+case "$DEVICE $MODEL" in
+  *a52sxq*|*SM-A528B*) ;;
+  *) abort "Aparelho nao identificado como a52sxq/SM-A528B: $DEVICE $MODEL" ;;
+esac
+for PART in super boot dtbo vendor_boot vbmeta; do
+  [ -e "/dev/block/by-name/$PART" ] || abort "Particao ausente: $PART"
+done
+CONFIRM="$(cat /sdcard/.a52sxq-twrp-confirm 2>/dev/null || true)"
+[ "$CONFIRM" = "FLASH A52SXQ HYPEROS CANDIDATE" ] || abort "Crie /sdcard/.a52sxq-twrp-confirm com a frase exata para confirmar"
+ui_print "Device: $DEVICE $MODEL"
+ui_print "Flashing native boot chain..."
+unzip -p "$ZIP" payload/physical/boot.img | dd of=/dev/block/by-name/boot bs=4M || abort "boot falhou"
+unzip -p "$ZIP" payload/physical/dtbo.img | dd of=/dev/block/by-name/dtbo bs=4M || abort "dtbo falhou"
+unzip -p "$ZIP" payload/physical/vendor_boot.img | dd of=/dev/block/by-name/vendor_boot bs=4M || abort "vendor_boot falhou"
+unzip -p "$ZIP" payload/physical/vbmeta.img | dd of=/dev/block/by-name/vbmeta bs=4M || abort "vbmeta falhou"
+ui_print "Converting sparse super to raw super..."
+unzip -p "$ZIP" payload/super.img | simg2img /dev/stdin /dev/block/by-name/super || abort "super/simg2img falhou"
+sync
+ui_print "Concluido; reinicie somente apos confirmar que o rollback esta disponivel."
+exit 0
+EOF
+  chmod +x "$PACKAGE_DIR/META-INF/com/google/android/update-binary"
+  cp -f "$PACKAGE_DIR/META-INF/com/google/android/update-binary" "$OUT_DIR/twrp-update-binary"
+else
 cat > "$PACKAGE_DIR/flash-fastbootd.sh" <<'EOF'
 #!/usr/bin/env bash
 set -Eeuo pipefail
@@ -130,6 +173,7 @@ ui_print "Use flash-fastbootd.sh no computador; recovery install bloqueado."
 exit 1
 EOF
 chmod +x "$PACKAGE_DIR/META-INF/com/google/android/update-binary"
+fi
 
 cat > "$PACKAGE_DIR/META-INF/com/android/metadata" <<EOF
 post-device=a52sxq
@@ -138,9 +182,17 @@ post-sdk-level=35
 pre-device=a52sxq|SM-A528B
 EOF
 
+if [[ "$INSTALL_MODE" == "twrp" ]]; then
+  PACKAGE_FORMAT=twrp-recovery-zip
+  RECOVERY_INSTALL_BLOCKED=false
+else
+  PACKAGE_FORMAT=fastbootd-bundle-zip
+  RECOVERY_INSTALL_BLOCKED=true
+fi
 cat > "$MANIFEST_DIR/candidate.properties" <<EOF
 kind=flashable-candidate
-format=fastbootd-bundle-zip
+format=$PACKAGE_FORMAT
+install_mode=$INSTALL_MODE
 run_id=$RUN_ID
 target_device=a52sxq
 target_model=SM-A528B
@@ -157,7 +209,8 @@ native_vbmeta_preserved=true
 flashable_candidate=true
 safe_to_flash=false
 boot_confirmed=false
-recovery_install_blocked=true
+recovery_install_blocked=$RECOVERY_INSTALL_BLOCKED
+twrp_installer=$([[ "$INSTALL_MODE" == "twrp" ]] && echo true || echo false)
 EOF
 cat > "$MANIFEST_DIR/partition-map.txt" <<EOF
 boot -> native Samsung boot.img
@@ -177,6 +230,6 @@ cp -f "$MANIFEST_DIR"/* "$PACKAGE_DIR/"
 PACKAGE="$OUT_DIR/a52sxq-hyperos2-fastbootd-candidate-${RUN_ID}.zip"
 (cd "$PACKAGE_DIR" && zip -q -0 -r "$PACKAGE" .)
 sha256sum "$PACKAGE" > "$PACKAGE.sha256"
-printf 'candidate=%s\npackage=%s\nflashable_candidate=true\nsafe_to_flash=false\nboot_confirmed=false\n' "$PACKAGE" "$PACKAGE" > "$OUT_DIR/package.properties"
+printf 'candidate=%s\npackage=%s\ninstall_mode=%s\nflashable_candidate=true\nsafe_to_flash=false\nboot_confirmed=false\nrecovery_install_blocked=%s\n' "$PACKAGE" "$PACKAGE" "$INSTALL_MODE" "$RECOVERY_INSTALL_BLOCKED" > "$OUT_DIR/package.properties"
 rm -rf "$WORK_DIR" "$PACKAGE_DIR"
 echo "Candidato criado: $PACKAGE"
