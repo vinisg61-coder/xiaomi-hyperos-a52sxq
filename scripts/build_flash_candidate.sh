@@ -5,6 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DONOR_ARCHIVE="${DONOR_ARCHIVE:-${1:-}}"
 NATIVE_DIR="${NATIVE_DIR:-${2:-}}"
 OUT_DIR="${OUT_DIR:-${3:-$ROOT_DIR/out/flash-candidate}}"
+if [[ "$OUT_DIR" != /* ]]; then OUT_DIR="$ROOT_DIR/$OUT_DIR"; fi
 TOOLS_DIR="${TOOLS_DIR:-$ROOT_DIR/tools}"
 LPMTOOLS_DIR="${LPMTOOLS_DIR:-/home/ubuntu/aosp15_partition_tools/linux_glibc_x86_64}"
 AVBTOOL="${AVBTOOL:-$ROOT_DIR/tools/avbtool.py}"
