@@ -25,11 +25,11 @@ on:
         type: choice
         options: [userdebug, eng, user]
       BUILD_MODE:
-        description: 'prepare valida; donor-validate verifica o donor; port-stage monta staging; flash-candidate gera ZIP fastbootd experimental; full compila a árvore Android'
+        description: 'prepare valida; donor-validate verifica o donor; port-stage monta staging; flash-candidate gera ZIP fastbootd experimental; twrp-candidate gera ZIP TWRP experimental; full compila a árvore Android'
         required: true
         default: 'prepare'
         type: choice
-        options: [prepare, donor-validate, port-stage, flash-candidate, full]
+        options: [prepare, donor-validate, port-stage, flash-candidate, twrp-candidate, full]
       CLEAN_BUILD:
         description: 'Remover workspaces e saídas antes do build'
         required: true
@@ -91,7 +91,7 @@ jobs:
           ./scripts/setup.sh --check-only
 
       - name: Install Android 15 partition tools for flash candidate
-        if: ${{ env.BUILD_MODE == 'flash-candidate' }}
+        if: ${{ env.BUILD_MODE == 'flash-candidate' || env.BUILD_MODE == 'twrp-candidate' }}
         run: |
           git clone --depth 1 https://github.com/Rprop/aosp15_partition_tools /tmp/aosp15_partition_tools
           cd /tmp/aosp15_partition_tools
@@ -101,7 +101,7 @@ jobs:
 
       - name: Synchronize pinned public sources
         run: |
-          if [ "$BUILD_MODE" = full ] || [ "$BUILD_MODE" = donor-validate ] || [ "$BUILD_MODE" = port-stage ] || [ "$BUILD_MODE" = flash-candidate ]; then
+          if [ "$BUILD_MODE" = full ] || [ "$BUILD_MODE" = donor-validate ] || [ "$BUILD_MODE" = port-stage ] || [ "$BUILD_MODE" = flash-candidate ] || [ "$BUILD_MODE" = twrp-candidate ]; then
             ./scripts/sync.sh --workspace .work --clean --require-hyperos
           else
             ./scripts/sync.sh --workspace .work --clean
@@ -122,8 +122,12 @@ jobs:
             printf 'port_stage=true\nflashable=false\nboot_confirmed=false\n' > out/build-report.txt
           elif [ "$BUILD_MODE" = flash-candidate ]; then
             ./scripts/fetch_a52sxq_native.sh --out-dir .work/a52sxq-native --clean
-            LPMTOOLS_DIR=/tmp/aosp15_partition_tools/linux_glibc_x86_64 ./scripts/build_flash_candidate.sh .work/hyperos-donor.zip .work/a52sxq-native out/flash-candidate
-            printf 'flash_candidate=true\nflashable_candidate=true\nsafe_to_flash=false\nboot_confirmed=false\n' > out/build-report.txt
+            LPMTOOLS_DIR=/tmp/aosp15_partition_tools/linux_glibc_x86_64 INSTALL_MODE=fastbootd ./scripts/build_flash_candidate.sh .work/hyperos-donor.zip .work/a52sxq-native out/flash-candidate
+            printf 'flash_candidate=true\ninstall_mode=fastbootd\nflashable_candidate=true\nsafe_to_flash=false\nboot_confirmed=false\n' > out/build-report.txt
+          elif [ "$BUILD_MODE" = twrp-candidate ]; then
+            ./scripts/fetch_a52sxq_native.sh --out-dir .work/a52sxq-native --clean
+            LPMTOOLS_DIR=/tmp/aosp15_partition_tools/linux_glibc_x86_64 INSTALL_MODE=twrp ./scripts/build_flash_candidate.sh .work/hyperos-donor.zip .work/a52sxq-native out/twrp-candidate
+            printf 'flash_candidate=true\ninstall_mode=twrp\nflashable_candidate=true\nsafe_to_flash=false\nboot_confirmed=false\nrecovery_install_blocked=false\n' > out/build-report.txt
           else
             ./scripts/build.sh \
               --source-root . \
@@ -144,11 +148,11 @@ jobs:
           fi
 
       - name: Package staging result
-        if: ${{ env.BUILD_MODE != 'flash-candidate' }}
+        if: ${{ env.BUILD_MODE != 'flash-candidate' && env.BUILD_MODE != 'twrp-candidate' }}
         run: ./scripts/package.sh --input-dir out --output-dir dist
 
       - name: Upload staging bundle and reports
-        if: ${{ env.BUILD_MODE != 'flash-candidate' }}
+        if: ${{ env.BUILD_MODE != 'flash-candidate' && env.BUILD_MODE != 'twrp-candidate' }}
         uses: actions/upload-artifact@v4
         with:
           name: a52sxq-${{ env.BUILD_MODE }}-${{ github.run_number }}
@@ -172,6 +176,22 @@ jobs:
             out/flash-candidate/*.zip.sha256
             out/flash-candidate/package.properties
             out/flash-candidate/manifest/
+            out/build-report.txt
+            out/verify/build-report.txt
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload experimental TWRP candidate
+        if: ${{ env.BUILD_MODE == 'twrp-candidate' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: a52sxq-twrp-candidate-${{ github.run_number }}
+          path: |
+            out/twrp-candidate/*.zip
+            out/twrp-candidate/*.zip.sha256
+            out/twrp-candidate/package.properties
+            out/twrp-candidate/manifest/
+            out/twrp-candidate/twrp-update-binary
             out/build-report.txt
             out/verify/build-report.txt
           if-no-files-found: error
