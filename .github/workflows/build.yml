@@ -25,11 +25,11 @@ on:
         type: choice
         options: [userdebug, eng, user]
       BUILD_MODE:
-        description: 'prepare valida; donor-validate verifica o donor; port-stage combina userspace HyperOS e hardware A52s; full compila a árvore Android'
+        description: 'prepare valida; donor-validate verifica o donor; port-stage monta staging; flash-candidate gera ZIP fastbootd experimental; full compila a árvore Android'
         required: true
         default: 'prepare'
         type: choice
-        options: [prepare, donor-validate, port-stage, full]
+        options: [prepare, donor-validate, port-stage, flash-candidate, full]
       CLEAN_BUILD:
         description: 'Remover workspaces e saídas antes do build'
         required: true
@@ -83,16 +83,25 @@ jobs:
         run: |
           sudo apt-get update
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            bash coreutils curl git jq lz4 openjdk-17-jdk python3 tar unzip zstd ca-certificates
+            bash coreutils curl git jq lz4 openjdk-17-jdk python3 tar unzip zip zstd ca-certificates
 
       - name: Check project scripts
         run: |
           chmod +x scripts/*.sh
           ./scripts/setup.sh --check-only
 
+      - name: Install Android 15 partition tools for flash candidate
+        if: ${{ env.BUILD_MODE == 'flash-candidate' }}
+        run: |
+          git clone --depth 1 https://github.com/Rprop/aosp15_partition_tools /tmp/aosp15_partition_tools
+          cd /tmp/aosp15_partition_tools
+          git fetch --depth 1 origin 5e92a5d
+          git checkout --detach 5e92a5d
+          chmod +x linux_glibc_x86_64/lpmake
+
       - name: Synchronize pinned public sources
         run: |
-          if [ "$BUILD_MODE" = full ] || [ "$BUILD_MODE" = donor-validate ] || [ "$BUILD_MODE" = port-stage ]; then
+          if [ "$BUILD_MODE" = full ] || [ "$BUILD_MODE" = donor-validate ] || [ "$BUILD_MODE" = port-stage ] || [ "$BUILD_MODE" = flash-candidate ]; then
             ./scripts/sync.sh --workspace .work --clean --require-hyperos
           else
             ./scripts/sync.sh --workspace .work --clean
@@ -111,6 +120,10 @@ jobs:
             ./scripts/fetch_a52sxq_native.sh --out-dir .work/a52sxq-native --clean
             ./scripts/port_stage.sh --source-root . --donor-archive .work/hyperos-donor.zip --native-dir .work/a52sxq-native --out-dir out/port
             printf 'port_stage=true\nflashable=false\nboot_confirmed=false\n' > out/build-report.txt
+          elif [ "$BUILD_MODE" = flash-candidate ]; then
+            ./scripts/fetch_a52sxq_native.sh --out-dir .work/a52sxq-native --clean
+            LPMTOOLS_DIR=/tmp/aosp15_partition_tools/linux_glibc_x86_64 ./scripts/build_flash_candidate.sh .work/hyperos-donor.zip .work/a52sxq-native out/flash-candidate
+            printf 'flash_candidate=true\nflashable_candidate=true\nsafe_to_flash=false\nboot_confirmed=false\n' > out/build-report.txt
           else
             ./scripts/build.sh \
               --source-root . \
@@ -130,10 +143,12 @@ jobs:
             ./scripts/verify.sh --source-root . --report-dir out/verify
           fi
 
-      - name: Package result
+      - name: Package staging result
+        if: ${{ env.BUILD_MODE != 'flash-candidate' }}
         run: ./scripts/package.sh --input-dir out --output-dir dist
 
-      - name: Upload bring-up bundle and reports
+      - name: Upload staging bundle and reports
+        if: ${{ env.BUILD_MODE != 'flash-candidate' }}
         uses: actions/upload-artifact@v4
         with:
           name: a52sxq-${{ env.BUILD_MODE }}-${{ github.run_number }}
@@ -144,5 +159,20 @@ jobs:
             out/manifest/
             out/logs/
             out/donor-validate/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload experimental flash candidate
+        if: ${{ env.BUILD_MODE == 'flash-candidate' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: a52sxq-flash-candidate-${{ github.run_number }}
+          path: |
+            out/flash-candidate/*.zip
+            out/flash-candidate/*.zip.sha256
+            out/flash-candidate/package.properties
+            out/flash-candidate/manifest/
+            out/build-report.txt
+            out/verify/build-report.txt
           if-no-files-found: error
           retention-days: 14
